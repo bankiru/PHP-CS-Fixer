@@ -23,21 +23,33 @@ use Symfony\Component\Stopwatch\StopwatchEvent;
  */
 final class JsonReportTest extends \PHPUnit_Framework_TestCase
 {
-    /** @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
-    private $mockStopwatch;
-
     /** @var JsonReport */
     private $report;
 
+    protected function setUp()
+    {
+        $this->report = new JsonReport();
+    }
+
+    /**
+     * @covers PhpCsFixer\Report\JsonReport::getFormat
+     */
+    public function testGetFormat()
+    {
+        $this->assertSame('json', $this->report->getFormat());
+    }
+
     public function testProcessSimple()
     {
-        $this->report->setDecoratedOutput(false);
-        $this->report->setShowAppliedFixers(false);
-        $this->report->setShowDiff(false);
-        $this->report->setDryRun(false);
-
-        $expectedJson = '{"files":[{"name":"someFile.php"}],"memory":2.5,"time":{"total":1.234}}';
-
+        $expectedJson = <<<'JSON'
+{
+    "files":[
+        {
+            "name": "someFile.php"
+        }
+    ]
+}
+JSON;
         $actualJson = $this->report->process(
             array(
                 'someFile.php' => array(
@@ -49,15 +61,18 @@ final class JsonReportTest extends \PHPUnit_Framework_TestCase
         $this->assertJsonStringEqualsJsonString($expectedJson, $actualJson);
     }
 
-    public function testProcessComplex()
+    public function testProcessWithDiff()
     {
-        $this->report->setDecoratedOutput(true);
-        $this->report->setShowAppliedFixers(true);
-        $this->report->setShowDiff(true);
-        $this->report->setDryRun(true);
-
-        $expectedJson = '{"files":[{"name":"someFile.php","appliedFixers":["some_fixer_name_here"],"diff":"this text is a diff ;)"}],"memory":2.5,"time":{"total":1.234}}';
-
+        $expectedJson = <<<'JSON'
+{
+    "files":[
+        {
+            "name": "someFile.php",
+            "diff": "this text is a diff ;)"
+        }
+    ]
+}
+JSON;
         $actualJson = $this->report->process(
             array(
                 'someFile.php' => array(
@@ -70,7 +85,32 @@ final class JsonReportTest extends \PHPUnit_Framework_TestCase
         $this->assertJsonStringEqualsJsonString($expectedJson, $actualJson);
     }
 
-    protected function setUp()
+    public function testProcessWithAppliedFixers()
+    {
+        $this->report->configure(array('add-applied-fixers' => true));
+
+        $expectedJson = <<<'JSON'
+{
+    "files":[
+        {
+            "name": "someFile.php",
+            "appliedFixers":["some_fixer_name_here"]
+        }
+    ]
+}
+JSON;
+        $actualJson = $this->report->process(
+            array(
+                'someFile.php' => array(
+                    'appliedFixers' => array('some_fixer_name_here'),
+                ),
+            )
+        );
+
+        $this->assertJsonStringEqualsJsonString($expectedJson, $actualJson);
+    }
+
+    public function testProcessWithStopwatch()
     {
         /* @var StopwatchEvent|\PHPUnit_Framework_MockObject_MockObject */
         $mockEvent = $this->getMockBuilder('Symfony\Component\Stopwatch\StopwatchEvent')
@@ -85,14 +125,101 @@ final class JsonReportTest extends \PHPUnit_Framework_TestCase
             ->method('getDuration')
             ->willReturn(1234);
 
-        $this->mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
-        $this->mockStopwatch
+        /* @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
+        $mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
+        $mockStopwatch
             ->expects($this->once())
             ->method('getEvent')
             ->with($this->equalTo('fixFiles'))
             ->willReturn($mockEvent);
 
-        $this->report = new JsonReport();
-        $this->report->setStopwatch($this->mockStopwatch);
+        $this->report->configure(array('stopwatch' => $mockStopwatch));
+
+        $expectedJson = <<<'JSON'
+{
+    "files":[
+        {
+            "name": "someFile.php"
+        }
+    ],
+    "memory": 2.5,
+    "time": {
+        "total": 1.234
+    }
+}
+JSON;
+        $actualJson = $this->report->process(
+            array(
+                'someFile.php' => array(
+                    'appliedFixers' => array('some_fixer_name_here'),
+                ),
+            )
+        );
+
+        $this->assertJsonStringEqualsJsonString($expectedJson, $actualJson);
+    }
+
+    public function testProcessComplex()
+    {
+        /* @var StopwatchEvent|\PHPUnit_Framework_MockObject_MockObject */
+        $mockEvent = $this->getMockBuilder('Symfony\Component\Stopwatch\StopwatchEvent')
+            ->disableOriginalConstructor()
+            ->getMock();
+        $mockEvent
+            ->expects($this->once())
+            ->method('getMemory')
+            ->willReturn(2.5 * 1024 * 1024);
+        $mockEvent
+            ->expects($this->once())
+            ->method('getDuration')
+            ->willReturn(1234);
+
+        /* @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
+        $mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
+        $mockStopwatch
+            ->expects($this->once())
+            ->method('getEvent')
+            ->with($this->equalTo('fixFiles'))
+            ->willReturn($mockEvent);
+
+        $this->report->configure(array(
+            'add-applied-fixers' => true,
+            'stopwatch' => $mockStopwatch,
+        ));
+
+        $expectedJson = <<<'JSON'
+{
+    "files":[
+        {
+            "name": "someFile.php",
+            "appliedFixers":["some_fixer_name_here"],
+            "diff": "this text is a diff ;)"
+        },
+        {
+            "name": "anotherFile.php",
+            "appliedFixers":["another_fixer_name_here"],
+            "diff": "another diff here ;)"
+        }
+    ],
+    "memory": 2.5,
+    "time": {
+        "total": 1.234
+    }
+}
+JSON;
+        $actualJson = $this->report->process(
+            array(
+                'someFile.php' => array(
+                    'appliedFixers' => array('some_fixer_name_here'),
+                    'diff' => 'this text is a diff ;)',
+                ),
+                'anotherFile.php' => array(
+                    'appliedFixers' => array('another_fixer_name_here'),
+                    'diff' => 'another diff here ;)',
+                ),
+            )
+        );
+
+        $this->assertJsonStringEqualsJsonString($expectedJson, $actualJson);
     }
 }

@@ -17,6 +17,8 @@ use PhpCsFixer\ConfigurationException\InvalidConfigurationException;
 use PhpCsFixer\Finder;
 use PhpCsFixer\FixerFactory;
 use PhpCsFixer\FixerInterface;
+use PhpCsFixer\ReportFactory;
+use PhpCsFixer\ReportInterface;
 use PhpCsFixer\RuleSet;
 use PhpCsFixer\StdinFileInfo;
 use Symfony\Component\Filesystem\Filesystem;
@@ -70,6 +72,16 @@ final class ConfigurationResolver
     private $format;
 
     /**
+     * @var ReportFactory
+     */
+    private $reportFactory;
+
+    /**
+     * @var ReportInterface
+     */
+    private $report;
+
+    /**
      * @var bool
      */
     private $isStdIn;
@@ -108,6 +120,9 @@ final class ConfigurationResolver
     {
         $this->fixerFactory = new FixerFactory();
         $this->fixerFactory->registerBuiltInFixers();
+
+        $this->reportFactory = new ReportFactory();
+        $this->reportFactory->registerBuiltInReports();
     }
 
     /**
@@ -158,6 +173,22 @@ final class ConfigurationResolver
     public function getFormat()
     {
         return $this->format;
+    }
+
+    /**
+     * @return ReportFactory
+     */
+    public function getReportFactory()
+    {
+        return $this->reportFactory;
+    }
+
+    /**
+     * @return ReportInterface
+     */
+    public function getReport()
+    {
+        return $this->report;
     }
 
     /**
@@ -224,6 +255,9 @@ final class ConfigurationResolver
         $this->resolveProgress();
         $this->resolveUsingCache();
         $this->resolveCacheFile();
+
+        // TODO: register custom reports like custom fixers
+        $this->resolveReport();
 
         $this->config->fixers($this->getFixers());
         $this->config->setRules($this->getRules());
@@ -494,6 +528,12 @@ final class ConfigurationResolver
         }
 
         $this->format = $format;
+    }
+
+    protected function resolveReport()
+    {
+        $this->reportFactory->setIsDryRun($this->isDryRun());
+        $this->report = $this->reportFactory->getReportByFormat($this->format);
     }
 
     /**

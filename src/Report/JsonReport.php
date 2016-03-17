@@ -12,11 +12,39 @@
 
 namespace PhpCsFixer\Report;
 
+use PhpCsFixer\ReportInterface;
+use Symfony\Component\Stopwatch\Stopwatch;
+
 /**
  * @internal
  */
-final class JsonReport extends AbstractReport
+final class JsonReport implements ReportInterface
 {
+    /** @var bool */
+    private $addAppliedFixers = false;
+
+    /** @var Stopwatch */
+    private $stopwatch;
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getFormat()
+    {
+        return 'json';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function configure(array $options)
+    {
+        $this->addAppliedFixers = isset($options['add-applied-fixers']) && $options['add-applied-fixers'];
+        if (isset($options['stopwatch'])) {
+            $this->stopwatch = $options['stopwatch'];
+        }
+    }
+
     /**
      * {@inheritdoc}
      */
@@ -27,26 +55,28 @@ final class JsonReport extends AbstractReport
         foreach ($changed as $file => $fixResult) {
             $jfile = array('name' => $file);
 
-            if ($this->showAppliedFixers) {
+            if ($this->addAppliedFixers) {
                 $jfile['appliedFixers'] = $fixResult['appliedFixers'];
             }
 
-            if ($this->showDiff) {
+            if (!empty($fixResult['diff'])) {
                 $jfile['diff'] = $fixResult['diff'];
             }
 
             $jFiles[] = $jfile;
         }
 
-        $fixEvent = $this->stopwatch->getEvent('fixFiles');
-
         $json = array(
             'files' => $jFiles,
-            'memory' => round($fixEvent->getMemory() / 1024 / 1024, 3),
-            'time' => array(
-                'total' => round($fixEvent->getDuration() / 1000, 3),
-            ),
         );
+
+        if ($this->stopwatch) {
+            $fixEvent = $this->stopwatch->getEvent('fixFiles');
+            $json['memory'] = round($fixEvent->getMemory() / 1024 / 1024, 3);
+            $json['time'] = array(
+                'total' => round($fixEvent->getDuration() / 1000, 3),
+            );
+        }
 
         return json_encode($json);
     }

@@ -12,11 +12,39 @@
 
 namespace PhpCsFixer\Report;
 
+use PhpCsFixer\ReportInterface;
+use Symfony\Component\Stopwatch\Stopwatch;
+
 /**
  * @internal
  */
-final class XmlReport extends AbstractReport
+final class XmlReport implements ReportInterface
 {
+    /** @var bool */
+    private $addAppliedFixers = false;
+
+    /** @var Stopwatch */
+    private $stopwatch;
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getFormat()
+    {
+        return 'xml';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function configure(array $options)
+    {
+        $this->addAppliedFixers = isset($options['add-applied-fixers']) && $options['add-applied-fixers'];
+        if (isset($options['stopwatch'])) {
+            $this->stopwatch = $options['stopwatch'];
+        }
+    }
+
     /**
      * {@inheritdoc}
      */
@@ -37,41 +65,89 @@ final class XmlReport extends AbstractReport
             $fileXML->setAttribute('name', $file);
             $filesXML->appendChild($fileXML);
 
-            if ($this->showAppliedFixers) {
-                $appliedFixersXML = $dom->createElement('applied_fixers');
-                $fileXML->appendChild($appliedFixersXML);
-
-                foreach ($fixResult['appliedFixers'] as $appliedFixer) {
-                    $appliedFixerXML = $dom->createElement('applied_fixer');
-                    $appliedFixerXML->setAttribute('name', $appliedFixer);
-                    $appliedFixersXML->appendChild($appliedFixerXML);
-                }
+            if ($this->addAppliedFixers) {
+                $fileXML->appendChild($this->createAppliedFixersElement($dom, $fixResult));
             }
 
-            if ($this->showDiff) {
-                $diffXML = $dom->createElement('diff');
-                $diffXML->appendChild($dom->createCDATASection($fixResult['diff']));
-                $fileXML->appendChild($diffXML);
+            if (!empty($fixResult['diff'])) {
+                $fileXML->appendChild($this->createDiffElement($dom, $fixResult));
             }
         }
 
-        $fixEvent = $this->stopwatch->getEvent('fixFiles');
-
-        $timeXML = $dom->createElement('time');
-        $memoryXML = $dom->createElement('memory');
-        $root->appendChild($timeXML);
-        $root->appendChild($memoryXML);
-
-        $memoryXML->setAttribute('value', round($fixEvent->getMemory() / 1024 / 1024, 3));
-        $memoryXML->setAttribute('unit', 'MB');
-
-        $timeXML->setAttribute('unit', 's');
-        $timeTotalXML = $dom->createElement('total');
-        $timeTotalXML->setAttribute('value', round($fixEvent->getDuration() / 1000, 3));
-        $timeXML->appendChild($timeTotalXML);
+        if ($this->stopwatch) {
+            $root->appendChild($this->createTimeElement($dom));
+            $root->appendChild($this->createMemoryElement($dom));
+        }
 
         $dom->formatOutput = true;
 
         return $dom->saveXML();
+    }
+
+    /**
+     * @param \DOMDocument $dom
+     *
+     * @return \DOMElement
+     */
+    private function createTimeElement(\DOMDocument $dom)
+    {
+        $time = round($this->stopwatch->getEvent('fixFiles')->getDuration() / 1000, 3);
+
+        $timeXML = $dom->createElement('time');
+        $timeXML->setAttribute('unit', 's');
+        $timeTotalXML = $dom->createElement('total');
+        $timeTotalXML->setAttribute('value', $time);
+        $timeXML->appendChild($timeTotalXML);
+
+        return $timeXML;
+    }
+
+    /**
+     * @param \DOMDocument $dom
+     *
+     * @return \DOMElement
+     */
+    private function createMemoryElement(\DOMDocument $dom)
+    {
+        $memory = round($this->stopwatch->getEvent('fixFiles')->getMemory() / 1024 / 1024, 3);
+
+        $memoryXML = $dom->createElement('memory');
+        $memoryXML->setAttribute('value', $memory);
+        $memoryXML->setAttribute('unit', 'MB');
+
+        return $memoryXML;
+    }
+
+    /**
+     * @param \DOMDocument $dom
+     * @param array        $fixResult
+     *
+     * @return \DOMElement
+     */
+    private function createDiffElement(\DOMDocument $dom, array $fixResult)
+    {
+        $diffXML = $dom->createElement('diff');
+        $diffXML->appendChild($dom->createCDATASection($fixResult['diff']));
+
+        return $diffXML;
+    }
+
+    /**
+     * @param \DOMDocument $dom
+     * @param array        $fixResult
+     *
+     * @return \DOMElement
+     */
+    private function createAppliedFixersElement($dom, $fixResult)
+    {
+        $appliedFixersXML = $dom->createElement('applied_fixers');
+
+        foreach ($fixResult['appliedFixers'] as $appliedFixer) {
+            $appliedFixerXML = $dom->createElement('applied_fixer');
+            $appliedFixerXML->setAttribute('name', $appliedFixer);
+            $appliedFixersXML->appendChild($appliedFixerXML);
+        }
+
+        return $appliedFixersXML;
     }
 }

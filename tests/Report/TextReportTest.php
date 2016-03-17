@@ -23,13 +23,92 @@ use Symfony\Component\Stopwatch\StopwatchEvent;
  */
 final class TextReportTest extends \PHPUnit_Framework_TestCase
 {
-    /** @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
-    private $mockStopwatch;
-
     /** @var TextReport */
     private $report;
 
     protected function setUp()
+    {
+        $this->report = new TextReport();
+    }
+
+    /**
+     * @covers PhpCsFixer\Report\TextReport::getFormat
+     */
+    public function testGetFormat()
+    {
+        $this->assertSame('txt', $this->report->getFormat());
+    }
+
+    /**
+     * @covers PhpCsFixer\Report\TextReport::process
+     */
+    public function testProcessSimple()
+    {
+        $expectedtext = str_replace("\n", PHP_EOL, <<<'TEXT'
+
+   1) someFile.php
+
+TEXT
+        );
+
+        $actualText = $this->report->process(
+            array(
+                'someFile.php' => array(
+                    'appliedFixers' => array('some_fixer_name_here'),
+                ),
+            )
+        );
+
+        $this->assertSame($expectedtext, $actualText);
+    }
+
+    public function testProcessWithDiff()
+    {
+        $expectedtext = str_replace("\n", PHP_EOL, <<<'TEXT'
+
+   1) someFile.php
+      ---------- begin diff ----------
+this text is a diff ;)
+      ----------- end diff -----------
+
+TEXT
+        );
+
+        $actualText = $this->report->process(
+            array(
+                'someFile.php' => array(
+                    'appliedFixers' => array('some_fixer_name_here'),
+                    'diff' => 'this text is a diff ;)',
+                ),
+            )
+        );
+
+        $this->assertSame($expectedtext, $actualText);
+    }
+
+    public function testProcessWithAppliedFixers()
+    {
+        $this->report->configure(array('add-applied-fixers' => true));
+
+        $expectedtext = str_replace("\n", PHP_EOL, <<<'TEXT'
+
+   1) someFile.php (some_fixer_name_here)
+
+TEXT
+        );
+
+        $actualText = $this->report->process(
+            array(
+                'someFile.php' => array(
+                    'appliedFixers' => array('some_fixer_name_here'),
+                ),
+            )
+        );
+
+        $this->assertSame($expectedtext, $actualText);
+    }
+
+    public function testProcessWithStopwatch()
     {
         /* @var StopwatchEvent|\PHPUnit_Framework_MockObject_MockObject */
         $mockEvent = $this->getMockBuilder('Symfony\Component\Stopwatch\StopwatchEvent')
@@ -44,29 +123,24 @@ final class TextReportTest extends \PHPUnit_Framework_TestCase
             ->method('getDuration')
             ->willReturn(1234);
 
-        $this->mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
-        $this->mockStopwatch
+        /* @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
+        $mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
+        $mockStopwatch
             ->expects($this->once())
             ->method('getEvent')
             ->with($this->equalTo('fixFiles'))
             ->willReturn($mockEvent);
 
-        $this->report = new TextReport();
-        $this->report->setStopwatch($this->mockStopwatch);
-    }
+        $this->report->configure(array('stopwatch' => $mockStopwatch));
 
-    public function testProcessSimple()
-    {
-        $this->report->setDecoratedOutput(false);
-        $this->report->setShowAppliedFixers(false);
-        $this->report->setShowDiff(false);
-        $this->report->setDryRun(false);
+        $expectedtext = str_replace("\n", PHP_EOL, <<<'TEXT'
 
-        $expectedtext = <<<'TEXT'
    1) someFile.php
+
 Fixed all files in 1.234 seconds, 2.500 MB memory used
 
-TEXT;
+TEXT
+        );
 
         $actualText = $this->report->process(
             array(
@@ -79,28 +153,62 @@ TEXT;
         $this->assertSame($expectedtext, $actualText);
     }
 
-    public function testProcessComplex()
+    public function testProcessComplexWithDecoratedOutput()
     {
-        $this->report->setDecoratedOutput(true);
-        $this->report->setShowAppliedFixers(true);
-        $this->report->setShowDiff(true);
-        $this->report->setDryRun(true);
+        /* @var StopwatchEvent|\PHPUnit_Framework_MockObject_MockObject */
+        $mockEvent = $this->getMockBuilder('Symfony\Component\Stopwatch\StopwatchEvent')
+            ->disableOriginalConstructor()
+            ->getMock();
+        $mockEvent
+            ->expects($this->once())
+            ->method('getMemory')
+            ->willReturn(2.5 * 1024 * 1024);
+        $mockEvent
+            ->expects($this->once())
+            ->method('getDuration')
+            ->willReturn(1234);
 
-        $expectedtext = <<<'TEXT'
+        /* @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
+        $mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
+        $mockStopwatch
+            ->expects($this->once())
+            ->method('getEvent')
+            ->with($this->equalTo('fixFiles'))
+            ->willReturn($mockEvent);
+
+        $this->report->configure(array(
+            'add-applied-fixers' => true,
+            'dry-run' => true,
+            'decorated-output' => true,
+            'stopwatch' => $mockStopwatch,
+        ));
+
+        $expectedtext = str_replace("\n", PHP_EOL, <<<'TEXT'
+
    1) someFile.php (<comment>some_fixer_name_here</comment>)
 <comment>      ---------- begin diff ----------</comment>
 this text is a diff ;)
-<comment>      ---------- end diff ----------</comment>
+<comment>      ----------- end diff -----------</comment>
+
+   2) anotherFile.php (<comment>another_fixer_name_here</comment>)
+<comment>      ---------- begin diff ----------</comment>
+another diff here ;)
+<comment>      ----------- end diff -----------</comment>
 
 Checked all files in 1.234 seconds, 2.500 MB memory used
 
-TEXT;
+TEXT
+        );
 
         $actualText = $this->report->process(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
                     'diff' => 'this text is a diff ;)',
+                ),
+                'anotherFile.php' => array(
+                    'appliedFixers' => array('another_fixer_name_here'),
+                    'diff' => 'another diff here ;)',
                 ),
             )
         );

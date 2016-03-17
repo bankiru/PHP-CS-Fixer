@@ -23,7 +23,7 @@ use PhpCsFixer\FixerFactory;
 use PhpCsFixer\FixerInterface;
 use PhpCsFixer\Linter\Linter;
 use PhpCsFixer\Linter\UnavailableLinterException;
-use PhpCsFixer\Report\ReportInterface;
+use PhpCsFixer\ReportInterface;
 use PhpCsFixer\RuleSet;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -46,12 +46,6 @@ final class FixCommand extends Command
     const EXIT_STATUS_FLAG_HAS_CHANGED_FILES = 8;
     const EXIT_STATUS_FLAG_HAS_INVALID_CONFIG = 16;
     const EXIT_STATUS_FLAG_HAS_INVALID_FIXER_CONFIG = 32;
-
-    private static $reports = array(
-        'txt' => 'PhpCsFixer\\Report\\TextReport',
-        'json' => 'PhpCsFixer\\Report\\JsonReport',
-        'xml' => 'PhpCsFixer\\Report\\XmlReport',
-    );
 
     /**
      * EventDispatcher instance.
@@ -80,6 +74,11 @@ final class FixCommand extends Command
      * @var Fixer
      */
     protected $fixer;
+
+    /**
+     * @var ReportInterface
+     */
+    protected $report;
 
     /**
      * Config instance.
@@ -122,12 +121,12 @@ final class FixCommand extends Command
                     new InputOption('using-cache', '', InputOption::VALUE_REQUIRED, 'Does cache should be used (can be yes or no)', null),
                     new InputOption('cache-file', '', InputOption::VALUE_REQUIRED, 'The path to the cache file'),
                     new InputOption('diff', '', InputOption::VALUE_NONE, 'Also produce diff for each file'),
-                    new InputOption('format', '', InputOption::VALUE_REQUIRED, 'To output results in other formats', 'txt'),                )
+                    new InputOption('format', '', InputOption::VALUE_REQUIRED, 'To output results in other formats', 'txt'),
+                )
             )
             ->setDescription('Fixes a directory or a file')
-            ->setHelp(
-                <<<EOF
-                The <info>%command.name%</info> command tries to fix as much coding standards
+            ->setHelp(<<<EOF
+The <info>%command.name%</info> command tries to fix as much coding standards
 problems as possible on a given file or files in a given directory and its subdirectories:
 
     <info>php %command.full_name% /path/to/dir</info>
@@ -316,6 +315,11 @@ EOF
 
         $verbosity = $output->getVerbosity();
         $resolver = new ConfigurationResolver();
+        $resolver->getReportFactory()
+            ->setAddAppliedFixers(OutputInterface::VERBOSITY_VERBOSE <= $output->getVerbosity())
+            ->setIsDecoratedOutput($output->isDecorated())
+            ->setStopwatch($this->stopwatch)
+        ;
         $resolver
             ->setCwd(getcwd())
             ->setDefaultConfig($this->defaultConfig)
@@ -330,7 +334,8 @@ EOF
                 'cache-file' => $input->getOption('cache-file'),
                 'format' => $input->getOption('format'),
             ))
-            ->resolve();
+            ->resolve()
+        ;
 
         $config = $resolver->getConfig();
         $configFile = $resolver->getConfigFile();
@@ -366,8 +371,7 @@ EOF
         }
 
         $output->write(
-            $this->createReport($resolver->getFormat(), $input, $output)
-                ->process($changed)
+            $resolver->getReport()->process($changed)
         );
 
         $invalidErrors = $this->errorsManager->getInvalidErrors();
@@ -401,28 +405,6 @@ EOF
     }
 
     /**
-     * @param string          $format
-     * @param InputInterface  $input
-     * @param OutputInterface $output
-     *
-     * @return ReportInterface
-     */
-    protected function createReport($format, InputInterface $input, OutputInterface $output)
-    {
-        $reportClass = self::$reports[$format];
-
-        /** @var ReportInterface $report */
-        $report = new $reportClass();
-        $report->setDecoratedOutput($output->isDecorated());
-        $report->setShowAppliedFixers(OutputInterface::VERBOSITY_VERBOSE <= $output->getVerbosity());
-        $report->setShowDiff((bool) $input->getOption('diff'));
-        $report->setDryRun((bool) $input->getOption('dry-run'));
-        $report->setStopwatch($this->stopwatch);
-
-        return $report;
-    }
-
-    /**
      * @param OutputInterface $output
      * @param string          $process
      * @param Error[]         $errors
@@ -430,12 +412,10 @@ EOF
     private function listErrors(OutputInterface $output, $process, array $errors)
     {
         $output->writeln('');
-        $output->writeln(
-            sprintf(
-                'Files that were not fixed due to errors reported during %s:',
-                $process
-            )
-        );
+        $output->writeln(sprintf(
+            'Files that were not fixed due to errors reported during %s:',
+            $process
+        ));
 
         foreach ($errors as $i => $error) {
             $output->writeln(sprintf('%4d) %s', $i + 1, $error->getFilePath()));
@@ -491,16 +471,8 @@ EOF
             }
 
             if (!empty($sets)) {
-                $chunks = explode(
-                    "\n",
-                    wordwrap(sprintf("[%s]\n%s", implode(', ', $sets), $description), 72 - $maxName, "\n")
-                );
-                $help .= sprintf(
-                    " * <comment>%s</comment>%s %s\n",
-                    $fixer->getName(),
-                    str_repeat(' ', $maxName - strlen($fixer->getName())),
-                    array_shift($chunks)
-                );
+                $chunks = explode("\n", wordwrap(sprintf("[%s]\n%s", implode(', ', $sets), $description), 72 - $maxName, "\n"));
+                $help .= sprintf(" * <comment>%s</comment>%s %s\n", $fixer->getName(), str_repeat(' ', $maxName - strlen($fixer->getName())), array_shift($chunks));
             } else {
                 $chunks = explode("\n", wordwrap(sprintf("\n%s", $description), 72 - $maxName, "\n"));
                 $help .= sprintf(" * <comment>%s</comment>%s\n", $fixer->getName(), array_shift($chunks));
