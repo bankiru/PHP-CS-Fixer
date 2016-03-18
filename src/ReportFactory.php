@@ -17,6 +17,8 @@ use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\Stopwatch\Stopwatch;
 
 /**
+ * @author Boris Gorbylev <ekho@ekho.name>
+ *
  * @internal
  */
 final class ReportFactory
