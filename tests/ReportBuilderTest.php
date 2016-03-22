@@ -119,7 +119,6 @@ final class ReportBuilderTest extends \PHPUnit_Framework_TestCase
             'isDryRun' => true,
             'isDecoratedOutput' => true,
             'addAppliedFixers' => true,
-            'stopwatch' => null,
             'time' => 1234,
             'memory' => 1048576,
         );
