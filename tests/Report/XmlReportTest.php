@@ -13,8 +13,6 @@
 namespace PhpCsFixer\Tests\Report;
 
 use PhpCsFixer\Report\XmlReport;
-use Symfony\Component\Stopwatch\Stopwatch;
-use Symfony\Component\Stopwatch\StopwatchEvent;
 
 /**
  * @author Boris Gorbylev <ekho@ekho.name>
@@ -50,7 +48,7 @@ final class XmlReportTest extends \PHPUnit_Framework_TestCase
 </report>
 XML;
 
-        $actualXml = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -58,7 +56,7 @@ XML;
             )
         );
 
-        $this->assertXmlStringEqualsXmlString($expectedXml, $actualXml);
+        $this->assertXmlStringEqualsXmlString($expectedXml, $this->report->generate());
     }
 
     public function testProcessWithDiff()
@@ -74,7 +72,7 @@ XML;
 </report>
 XML;
 
-        $actualXml = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -83,12 +81,12 @@ XML;
             )
         );
 
-        $this->assertXmlStringEqualsXmlString($expectedXml, $actualXml);
+        $this->assertXmlStringEqualsXmlString($expectedXml, $this->report->generate());
     }
 
     public function testProcessWithAppliedFixers()
     {
-        $this->report->configure(array('add-applied-fixers' => true));
+        $this->report->setAddAppliedFixers(true);
 
         $expectedXml = <<<'XML'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -103,7 +101,7 @@ XML;
 </report>
 XML;
 
-        $actualXml = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -111,33 +109,15 @@ XML;
             )
         );
 
-        $this->assertXmlStringEqualsXmlString($expectedXml, $actualXml);
+        $this->assertXmlStringEqualsXmlString($expectedXml, $this->report->generate());
     }
 
-    public function testProcessWithStopwatch()
+    public function testProcessWithTimeAndMemory()
     {
-        /* @var StopwatchEvent|\PHPUnit_Framework_MockObject_MockObject */
-        $mockEvent = $this->getMockBuilder('Symfony\Component\Stopwatch\StopwatchEvent')
-            ->disableOriginalConstructor()
-            ->getMock();
-        $mockEvent
-            ->expects($this->once())
-            ->method('getMemory')
-            ->willReturn(2.5 * 1024 * 1024);
-        $mockEvent
-            ->expects($this->once())
-            ->method('getDuration')
-            ->willReturn(1234);
-
-        /* @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
-        $mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
-        $mockStopwatch
-            ->expects($this->exactly(2))
-            ->method('getEvent')
-            ->with($this->equalTo('fixFiles'))
-            ->willReturn($mockEvent);
-
-        $this->report->configure(array('stopwatch' => $mockStopwatch));
+        $this->report
+            ->setTime(1234)
+            ->setMemory(2.5 * 1024 * 1024)
+        ;
 
         $expectedXml = <<<'XML'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -152,7 +132,7 @@ XML;
 </report>
 XML;
 
-        $actualXml = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -160,36 +140,16 @@ XML;
             )
         );
 
-        $this->assertXmlStringEqualsXmlString($expectedXml, $actualXml);
+        $this->assertXmlStringEqualsXmlString($expectedXml, $this->report->generate());
     }
 
     public function testProcessComplex()
     {
-        /* @var StopwatchEvent|\PHPUnit_Framework_MockObject_MockObject */
-        $mockEvent = $this->getMockBuilder('Symfony\Component\Stopwatch\StopwatchEvent')
-            ->disableOriginalConstructor()
-            ->getMock();
-        $mockEvent
-            ->expects($this->once())
-            ->method('getMemory')
-            ->willReturn(2.5 * 1024 * 1024);
-        $mockEvent
-            ->expects($this->once())
-            ->method('getDuration')
-            ->willReturn(1234);
-
-        /* @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
-        $mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
-        $mockStopwatch
-            ->expects($this->exactly(2))
-            ->method('getEvent')
-            ->with($this->equalTo('fixFiles'))
-            ->willReturn($mockEvent);
-
-        $this->report->configure(array(
-            'add-applied-fixers' => true,
-            'stopwatch' => $mockStopwatch,
-        ));
+        $this->report
+            ->setAddAppliedFixers(true)
+            ->setTime(1234)
+            ->setMemory(2.5 * 1024 * 1024)
+        ;
 
         $expectedXml = <<<'XML'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -214,7 +174,7 @@ XML;
   <memory value="2.5" unit="MB"/>
 </report>
 XML;
-        $actualXml = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -227,6 +187,6 @@ XML;
             )
         );
 
-        $this->assertXmlStringEqualsXmlString($expectedXml, $actualXml);
+        $this->assertXmlStringEqualsXmlString($expectedXml, $this->report->generate());
     }
 }

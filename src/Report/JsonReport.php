@@ -13,18 +13,25 @@
 namespace PhpCsFixer\Report;
 
 use PhpCsFixer\ReportInterface;
-use Symfony\Component\Stopwatch\Stopwatch;
 
 /**
+ * @author Boris Gorbylev <ekho@ekho.name>
+ *
  * @internal
  */
 final class JsonReport implements ReportInterface
 {
+    /** @var array */
+    private $changed = array();
+
     /** @var bool */
     private $addAppliedFixers = false;
 
-    /** @var Stopwatch */
-    private $stopwatch;
+    /** @var int */
+    private $time;
+
+    /** @var int */
+    private $memory;
 
     /**
      * {@inheritdoc}
@@ -37,22 +44,55 @@ final class JsonReport implements ReportInterface
     /**
      * {@inheritdoc}
      */
-    public function configure(array $options)
+    public function setChanged(array $changed)
     {
-        $this->addAppliedFixers = isset($options['add-applied-fixers']) && $options['add-applied-fixers'];
-        if (isset($options['stopwatch'])) {
-            $this->stopwatch = $options['stopwatch'];
-        }
+        $this->changed = $changed;
+    }
+
+    /**
+     * @param bool $addAppliedFixers
+     *
+     * @return $this
+     */
+    public function setAddAppliedFixers($addAppliedFixers)
+    {
+        $this->addAppliedFixers = $addAppliedFixers;
+
+        return $this;
+    }
+
+    /**
+     * @param int $time
+     *
+     * @return $this
+     */
+    public function setTime($time)
+    {
+        $this->time = $time;
+
+        return $this;
+    }
+
+    /**
+     * @param int $memory
+     *
+     * @return $this
+     */
+    public function setMemory($memory)
+    {
+        $this->memory = $memory;
+
+        return $this;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function process(array $changed)
+    public function generate()
     {
         $jFiles = array();
 
-        foreach ($changed as $file => $fixResult) {
+        foreach ($this->changed as $file => $fixResult) {
             $jfile = array('name' => $file);
 
             if ($this->addAppliedFixers) {
@@ -70,12 +110,14 @@ final class JsonReport implements ReportInterface
             'files' => $jFiles,
         );
 
-        if ($this->stopwatch) {
-            $fixEvent = $this->stopwatch->getEvent('fixFiles');
-            $json['memory'] = round($fixEvent->getMemory() / 1024 / 1024, 3);
+        if ($this->time !== null) {
             $json['time'] = array(
-                'total' => round($fixEvent->getDuration() / 1000, 3),
+                'total' => round($this->time / 1000, 3),
             );
+        }
+
+        if ($this->memory !== null) {
+            $json['memory'] = round($this->memory / 1024 / 1024, 3);
         }
 
         return json_encode($json);

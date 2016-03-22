@@ -13,13 +13,17 @@
 namespace PhpCsFixer\Report;
 
 use PhpCsFixer\ReportInterface;
-use Symfony\Component\Stopwatch\Stopwatch;
 
 /**
+ * @author Boris Gorbylev <ekho@ekho.name>
+ *
  * @internal
  */
 class TextReport implements ReportInterface
 {
+    /** @var array */
+    private $changed = array();
+
     /** @var bool */
     private $addAppliedFixers = false;
 
@@ -29,8 +33,11 @@ class TextReport implements ReportInterface
     /** @var bool */
     private $isDecoratedOutput = false;
 
-    /** @var Stopwatch */
-    private $stopwatch;
+    /** @var int */
+    private $time;
+
+    /** @var int */
+    private $memory;
 
     /**
      * {@inheritdoc}
@@ -43,25 +50,80 @@ class TextReport implements ReportInterface
     /**
      * {@inheritdoc}
      */
-    public function configure(array $options)
+    public function setChanged(array $changed)
     {
-        $this->addAppliedFixers = isset($options['add-applied-fixers']) && $options['add-applied-fixers'];
-        $this->isDryRun = isset($options['dry-run']) && $options['dry-run'];
-        $this->isDecoratedOutput = isset($options['decorated-output']) && $options['decorated-output'];
-        if (isset($options['stopwatch'])) {
-            $this->stopwatch = $options['stopwatch'];
-        }
+        $this->changed = $changed;
+    }
+
+    /**
+     * @param bool $addAppliedFixers
+     *
+     * @return $this
+     */
+    public function setAddAppliedFixers($addAppliedFixers)
+    {
+        $this->addAppliedFixers = $addAppliedFixers;
+
+        return $this;
+    }
+
+    /**
+     * @param bool $isDryRun
+     *
+     * @return $this
+     */
+    public function setIsDryRun($isDryRun)
+    {
+        $this->isDryRun = $isDryRun;
+
+        return $this;
+    }
+
+    /**
+     * @param bool $isDecoratedOutput
+     *
+     * @return $this
+     */
+    public function setIsDecoratedOutput($isDecoratedOutput)
+    {
+        $this->isDecoratedOutput = $isDecoratedOutput;
+
+        return $this;
+    }
+
+    /**
+     * @param int $time
+     *
+     * @return $this
+     */
+    public function setTime($time)
+    {
+        $this->time = $time;
+
+        return $this;
+    }
+
+    /**
+     * @param int $memory
+     *
+     * @return $this
+     */
+    public function setMemory($memory)
+    {
+        $this->memory = $memory;
+
+        return $this;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function process(array $changed)
+    public function generate()
     {
         $output = '';
 
         $i = 1;
-        foreach ($changed as $file => $fixResult) {
+        foreach ($this->changed as $file => $fixResult) {
             $output .= $this->getFile($file, $i++);
             $output .= $this->getAppliedFixers($fixResult);
             $output .= $this->getDiff($fixResult);
@@ -136,17 +198,15 @@ class TextReport implements ReportInterface
      */
     private function getFooter()
     {
-        if (!$this->stopwatch) {
+        if ($this->time === null || $this->memory === null) {
             return '';
         }
-
-        $fixEvent = $this->stopwatch->getEvent('fixFiles');
 
         return PHP_EOL.sprintf(
             '%s all files in %.3f seconds, %.3f MB memory used'.PHP_EOL,
             $this->isDryRun ? 'Checked' : 'Fixed',
-            $fixEvent->getDuration() / 1000,
-            $fixEvent->getMemory() / 1024 / 1024
+            $this->time / 1000,
+            $this->memory / 1024 / 1024
         );
     }
 }

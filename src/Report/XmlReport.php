@@ -13,18 +13,25 @@
 namespace PhpCsFixer\Report;
 
 use PhpCsFixer\ReportInterface;
-use Symfony\Component\Stopwatch\Stopwatch;
 
 /**
+ * @author Boris Gorbylev <ekho@ekho.name>
+ *
  * @internal
  */
 final class XmlReport implements ReportInterface
 {
+    /** @var array */
+    private $changed = array();
+
     /** @var bool */
     private $addAppliedFixers = false;
 
-    /** @var Stopwatch */
-    private $stopwatch;
+    /** @var int */
+    private $time;
+
+    /** @var int */
+    private $memory;
 
     /**
      * {@inheritdoc}
@@ -37,18 +44,51 @@ final class XmlReport implements ReportInterface
     /**
      * {@inheritdoc}
      */
-    public function configure(array $options)
+    public function setChanged(array $changed)
     {
-        $this->addAppliedFixers = isset($options['add-applied-fixers']) && $options['add-applied-fixers'];
-        if (isset($options['stopwatch'])) {
-            $this->stopwatch = $options['stopwatch'];
-        }
+        $this->changed = $changed;
+    }
+
+    /**
+     * @param bool $addAppliedFixers
+     *
+     * @return $this
+     */
+    public function setAddAppliedFixers($addAppliedFixers)
+    {
+        $this->addAppliedFixers = $addAppliedFixers;
+
+        return $this;
+    }
+
+    /**
+     * @param int $time
+     *
+     * @return $this
+     */
+    public function setTime($time)
+    {
+        $this->time = $time;
+
+        return $this;
+    }
+
+    /**
+     * @param int $memory
+     *
+     * @return $this
+     */
+    public function setMemory($memory)
+    {
+        $this->memory = $memory;
+
+        return $this;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function process(array $changed)
+    public function generate()
     {
         $dom = new \DOMDocument('1.0', 'UTF-8');
         // new nodes should be added to this or existing children
@@ -59,7 +99,7 @@ final class XmlReport implements ReportInterface
         $root->appendChild($filesXML);
 
         $i = 1;
-        foreach ($changed as $file => $fixResult) {
+        foreach ($this->changed as $file => $fixResult) {
             $fileXML = $dom->createElement('file');
             $fileXML->setAttribute('id', $i++);
             $fileXML->setAttribute('name', $file);
@@ -74,8 +114,11 @@ final class XmlReport implements ReportInterface
             }
         }
 
-        if ($this->stopwatch) {
+        if ($this->time !== null) {
             $root->appendChild($this->createTimeElement($dom));
+        }
+
+        if ($this->memory !== null) {
             $root->appendChild($this->createMemoryElement($dom));
         }
 
@@ -91,7 +134,7 @@ final class XmlReport implements ReportInterface
      */
     private function createTimeElement(\DOMDocument $dom)
     {
-        $time = round($this->stopwatch->getEvent('fixFiles')->getDuration() / 1000, 3);
+        $time = round($this->time / 1000, 3);
 
         $timeXML = $dom->createElement('time');
         $timeXML->setAttribute('unit', 's');
@@ -109,7 +152,7 @@ final class XmlReport implements ReportInterface
      */
     private function createMemoryElement(\DOMDocument $dom)
     {
-        $memory = round($this->stopwatch->getEvent('fixFiles')->getMemory() / 1024 / 1024, 3);
+        $memory = round($this->memory / 1024 / 1024, 3);
 
         $memoryXML = $dom->createElement('memory');
         $memoryXML->setAttribute('value', $memory);

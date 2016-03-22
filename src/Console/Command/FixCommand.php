@@ -23,7 +23,7 @@ use PhpCsFixer\FixerFactory;
 use PhpCsFixer\FixerInterface;
 use PhpCsFixer\Linter\Linter;
 use PhpCsFixer\Linter\UnavailableLinterException;
-use PhpCsFixer\ReportInterface;
+use PhpCsFixer\ReportBuilder;
 use PhpCsFixer\RuleSet;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -74,11 +74,6 @@ final class FixCommand extends Command
      * @var Fixer
      */
     protected $fixer;
-
-    /**
-     * @var ReportInterface
-     */
-    protected $report;
 
     /**
      * Config instance.
@@ -315,11 +310,6 @@ EOF
 
         $verbosity = $output->getVerbosity();
         $resolver = new ConfigurationResolver();
-        $resolver->getReportFactory()
-            ->setAddAppliedFixers(OutputInterface::VERBOSITY_VERBOSE <= $output->getVerbosity())
-            ->setIsDecoratedOutput($output->isDecorated())
-            ->setStopwatch($this->stopwatch)
-        ;
         $resolver
             ->setCwd(getcwd())
             ->setDefaultConfig($this->defaultConfig)
@@ -370,8 +360,24 @@ EOF
             $this->fixer->setEventDispatcher(null);
         }
 
+        $reportBuilder = new ReportBuilder();
+
+        $fixEvent = $this->stopwatch->getEvent('fixFiles');
+
+        $report = $reportBuilder
+            ->registerBuiltInReports()
+            ->setAddAppliedFixers(OutputInterface::VERBOSITY_VERBOSE <= $output->getVerbosity())
+            ->setIsDecoratedOutput($output->isDecorated())
+            ->setIsDryRun($resolver->isDryRun())
+            ->setTime($fixEvent->getDuration())
+            ->setMemory($fixEvent->getMemory())
+            ->setFormat($resolver->getFormat())
+            ->setChanged($changed)
+            ->getReport()
+        ;
+
         $output->write(
-            $resolver->getReport()->process($changed)
+            $report->generate()
         );
 
         $invalidErrors = $this->errorsManager->getInvalidErrors();

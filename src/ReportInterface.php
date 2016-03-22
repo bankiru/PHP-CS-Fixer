@@ -12,6 +12,9 @@
 
 namespace PhpCsFixer;
 
+/**
+ * @author Boris Gorbylev <ekho@ekho.name>
+ */
 interface ReportInterface
 {
     /**
@@ -20,16 +23,14 @@ interface ReportInterface
     public function getFormat();
 
     /**
-     * @param array $options
+     * @param array $changed
      */
-    public function configure(array $options);
+    public function setChanged(array $changed);
 
     /**
      * Process changed files array. Returns generated report.
      *
-     * @param array $changed
-     *
      * @return string
      */
-    public function process(array $changed);
+    public function generate();
 }

@@ -13,8 +13,6 @@
 namespace PhpCsFixer\Tests\Report;
 
 use PhpCsFixer\Report\JsonReport;
-use Symfony\Component\Stopwatch\Stopwatch;
-use Symfony\Component\Stopwatch\StopwatchEvent;
 
 /**
  * @author Boris Gorbylev <ekho@ekho.name>
@@ -50,7 +48,7 @@ final class JsonReportTest extends \PHPUnit_Framework_TestCase
     ]
 }
 JSON;
-        $actualJson = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -58,7 +56,7 @@ JSON;
             )
         );
 
-        $this->assertJsonStringEqualsJsonString($expectedJson, $actualJson);
+        $this->assertJsonStringEqualsJsonString($expectedJson, $this->report->generate());
     }
 
     public function testProcessWithDiff()
@@ -73,7 +71,7 @@ JSON;
     ]
 }
 JSON;
-        $actualJson = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -82,12 +80,12 @@ JSON;
             )
         );
 
-        $this->assertJsonStringEqualsJsonString($expectedJson, $actualJson);
+        $this->assertJsonStringEqualsJsonString($expectedJson, $this->report->generate());
     }
 
     public function testProcessWithAppliedFixers()
     {
-        $this->report->configure(array('add-applied-fixers' => true));
+        $this->report->setAddAppliedFixers(true);
 
         $expectedJson = <<<'JSON'
 {
@@ -99,7 +97,7 @@ JSON;
     ]
 }
 JSON;
-        $actualJson = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -107,33 +105,15 @@ JSON;
             )
         );
 
-        $this->assertJsonStringEqualsJsonString($expectedJson, $actualJson);
+        $this->assertJsonStringEqualsJsonString($expectedJson, $this->report->generate());
     }
 
-    public function testProcessWithStopwatch()
+    public function testProcessWithTimeAndMemory()
     {
-        /* @var StopwatchEvent|\PHPUnit_Framework_MockObject_MockObject */
-        $mockEvent = $this->getMockBuilder('Symfony\Component\Stopwatch\StopwatchEvent')
-            ->disableOriginalConstructor()
-            ->getMock();
-        $mockEvent
-            ->expects($this->once())
-            ->method('getMemory')
-            ->willReturn(2.5 * 1024 * 1024);
-        $mockEvent
-            ->expects($this->once())
-            ->method('getDuration')
-            ->willReturn(1234);
-
-        /* @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
-        $mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
-        $mockStopwatch
-            ->expects($this->once())
-            ->method('getEvent')
-            ->with($this->equalTo('fixFiles'))
-            ->willReturn($mockEvent);
-
-        $this->report->configure(array('stopwatch' => $mockStopwatch));
+        $this->report
+            ->setTime(1234)
+            ->setMemory(2.5 * 1024 * 1024)
+        ;
 
         $expectedJson = <<<'JSON'
 {
@@ -148,7 +128,7 @@ JSON;
     }
 }
 JSON;
-        $actualJson = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -156,36 +136,16 @@ JSON;
             )
         );
 
-        $this->assertJsonStringEqualsJsonString($expectedJson, $actualJson);
+        $this->assertJsonStringEqualsJsonString($expectedJson, $this->report->generate());
     }
 
     public function testProcessComplex()
     {
-        /* @var StopwatchEvent|\PHPUnit_Framework_MockObject_MockObject */
-        $mockEvent = $this->getMockBuilder('Symfony\Component\Stopwatch\StopwatchEvent')
-            ->disableOriginalConstructor()
-            ->getMock();
-        $mockEvent
-            ->expects($this->once())
-            ->method('getMemory')
-            ->willReturn(2.5 * 1024 * 1024);
-        $mockEvent
-            ->expects($this->once())
-            ->method('getDuration')
-            ->willReturn(1234);
-
-        /* @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
-        $mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
-        $mockStopwatch
-            ->expects($this->once())
-            ->method('getEvent')
-            ->with($this->equalTo('fixFiles'))
-            ->willReturn($mockEvent);
-
-        $this->report->configure(array(
-            'add-applied-fixers' => true,
-            'stopwatch' => $mockStopwatch,
-        ));
+        $this->report
+            ->setAddAppliedFixers(true)
+            ->setTime(1234)
+            ->setMemory(2.5 * 1024 * 1024)
+        ;
 
         $expectedJson = <<<'JSON'
 {
@@ -207,7 +167,7 @@ JSON;
     }
 }
 JSON;
-        $actualJson = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -220,6 +180,6 @@ JSON;
             )
         );
 
-        $this->assertJsonStringEqualsJsonString($expectedJson, $actualJson);
+        $this->assertJsonStringEqualsJsonString($expectedJson, $this->report->generate());
     }
 }

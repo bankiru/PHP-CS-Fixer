@@ -13,8 +13,6 @@
 namespace PhpCsFixer\Tests\Report;
 
 use PhpCsFixer\Report\TextReport;
-use Symfony\Component\Stopwatch\Stopwatch;
-use Symfony\Component\Stopwatch\StopwatchEvent;
 
 /**
  * @author Boris Gorbylev <ekho@ekho.name>
@@ -39,9 +37,6 @@ final class TextReportTest extends \PHPUnit_Framework_TestCase
         $this->assertSame('txt', $this->report->getFormat());
     }
 
-    /**
-     * @covers PhpCsFixer\Report\TextReport::process
-     */
     public function testProcessSimple()
     {
         $expectedtext = str_replace("\n", PHP_EOL, <<<'TEXT'
@@ -51,7 +46,7 @@ final class TextReportTest extends \PHPUnit_Framework_TestCase
 TEXT
         );
 
-        $actualText = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -59,7 +54,7 @@ TEXT
             )
         );
 
-        $this->assertSame($expectedtext, $actualText);
+        $this->assertSame($expectedtext, $this->report->generate());
     }
 
     public function testProcessWithDiff()
@@ -74,7 +69,7 @@ this text is a diff ;)
 TEXT
         );
 
-        $actualText = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -83,12 +78,12 @@ TEXT
             )
         );
 
-        $this->assertSame($expectedtext, $actualText);
+        $this->assertSame($expectedtext, $this->report->generate());
     }
 
     public function testProcessWithAppliedFixers()
     {
-        $this->report->configure(array('add-applied-fixers' => true));
+        $this->report->setAddAppliedFixers(true);
 
         $expectedtext = str_replace("\n", PHP_EOL, <<<'TEXT'
 
@@ -97,7 +92,7 @@ TEXT
 TEXT
         );
 
-        $actualText = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -105,33 +100,15 @@ TEXT
             )
         );
 
-        $this->assertSame($expectedtext, $actualText);
+        $this->assertSame($expectedtext, $this->report->generate());
     }
 
-    public function testProcessWithStopwatch()
+    public function testProcessWithTimeAndMemory()
     {
-        /* @var StopwatchEvent|\PHPUnit_Framework_MockObject_MockObject */
-        $mockEvent = $this->getMockBuilder('Symfony\Component\Stopwatch\StopwatchEvent')
-            ->disableOriginalConstructor()
-            ->getMock();
-        $mockEvent
-            ->expects($this->once())
-            ->method('getMemory')
-            ->willReturn(2.5 * 1024 * 1024);
-        $mockEvent
-            ->expects($this->once())
-            ->method('getDuration')
-            ->willReturn(1234);
-
-        /* @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
-        $mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
-        $mockStopwatch
-            ->expects($this->once())
-            ->method('getEvent')
-            ->with($this->equalTo('fixFiles'))
-            ->willReturn($mockEvent);
-
-        $this->report->configure(array('stopwatch' => $mockStopwatch));
+        $this->report
+            ->setTime(1234)
+            ->setMemory(2.5 * 1024 * 1024)
+        ;
 
         $expectedtext = str_replace("\n", PHP_EOL, <<<'TEXT'
 
@@ -142,7 +119,7 @@ Fixed all files in 1.234 seconds, 2.500 MB memory used
 TEXT
         );
 
-        $actualText = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -150,38 +127,18 @@ TEXT
             )
         );
 
-        $this->assertSame($expectedtext, $actualText);
+        $this->assertSame($expectedtext, $this->report->generate());
     }
 
     public function testProcessComplexWithDecoratedOutput()
     {
-        /* @var StopwatchEvent|\PHPUnit_Framework_MockObject_MockObject */
-        $mockEvent = $this->getMockBuilder('Symfony\Component\Stopwatch\StopwatchEvent')
-            ->disableOriginalConstructor()
-            ->getMock();
-        $mockEvent
-            ->expects($this->once())
-            ->method('getMemory')
-            ->willReturn(2.5 * 1024 * 1024);
-        $mockEvent
-            ->expects($this->once())
-            ->method('getDuration')
-            ->willReturn(1234);
-
-        /* @var Stopwatch|\PHPUnit_Framework_MockObject_MockObject */
-        $mockStopwatch = $this->getMock('Symfony\Component\Stopwatch\Stopwatch');
-        $mockStopwatch
-            ->expects($this->once())
-            ->method('getEvent')
-            ->with($this->equalTo('fixFiles'))
-            ->willReturn($mockEvent);
-
-        $this->report->configure(array(
-            'add-applied-fixers' => true,
-            'dry-run' => true,
-            'decorated-output' => true,
-            'stopwatch' => $mockStopwatch,
-        ));
+        $this->report
+            ->setAddAppliedFixers(true)
+            ->setIsDryRun(true)
+            ->setIsDecoratedOutput(true)
+            ->setTime(1234)
+            ->setMemory(2.5 * 1024 * 1024)
+        ;
 
         $expectedtext = str_replace("\n", PHP_EOL, <<<'TEXT'
 
@@ -200,7 +157,7 @@ Checked all files in 1.234 seconds, 2.500 MB memory used
 TEXT
         );
 
-        $actualText = $this->report->process(
+        $this->report->setChanged(
             array(
                 'someFile.php' => array(
                     'appliedFixers' => array('some_fixer_name_here'),
@@ -213,6 +170,6 @@ TEXT
             )
         );
 
-        $this->assertSame($expectedtext, $actualText);
+        $this->assertSame($expectedtext, $this->report->generate());
     }
 }

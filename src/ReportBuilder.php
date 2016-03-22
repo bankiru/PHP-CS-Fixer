@@ -14,28 +14,35 @@ namespace PhpCsFixer;
 
 use Symfony\Component\Finder\Finder as SymfonyFinder;
 use Symfony\Component\Finder\SplFileInfo;
-use Symfony\Component\Stopwatch\Stopwatch;
 
 /**
  * @author Boris Gorbylev <ekho@ekho.name>
  *
  * @internal
  */
-final class ReportFactory
+final class ReportBuilder
 {
     /** @var ReportInterface[] */
     private $reports = array();
 
+    /** @var string */
+    private $format;
+
+    /** @var array */
+    private $changed = array();
+
     private $options = array(
-        'dry-run' => false,
-        'decorated-output' => false,
-        'add-applied-fixers' => false,
-        'stopwatch' => null,
+        'isDryRun' => false,
+        'isDecoratedOutput' => false,
+        'addAppliedFixers' => false,
+        'time' => null,
+        'memory' => null,
     );
 
     public function registerBuiltInReports()
     {
-        static $builtInReports = null;
+        /** @var string[] $builtInReports */
+        static $builtInReports;
 
         if (null === $builtInReports) {
             $builtInReports = array();
@@ -47,8 +54,8 @@ final class ReportFactory
             }
         }
 
-        foreach ($builtInReports as $class) {
-            $this->registerReport(new $class());
+        foreach ($builtInReports as $reportClass) {
+            $this->registerReport(new $reportClass());
         }
 
         return $this;
@@ -79,7 +86,7 @@ final class ReportFactory
      */
     public function setIsDryRun($isDryRun)
     {
-        $this->options['dry-run'] = $isDryRun;
+        $this->options['isDryRun'] = $isDryRun;
 
         return $this;
     }
@@ -91,7 +98,7 @@ final class ReportFactory
      */
     public function setIsDecoratedOutput($isDecoratedOutput)
     {
-        $this->options['decorated-output'] = $isDecoratedOutput;
+        $this->options['isDecoratedOutput'] = $isDecoratedOutput;
 
         return $this;
     }
@@ -103,19 +110,55 @@ final class ReportFactory
      */
     public function setAddAppliedFixers($addAppliedFixers)
     {
-        $this->options['add-applied-fixers'] = $addAppliedFixers;
+        $this->options['addAppliedFixers'] = $addAppliedFixers;
 
         return $this;
     }
 
     /**
-     * @param Stopwatch $stopwatch
+     * @param int $time
      *
      * @return $this
      */
-    public function setStopwatch(Stopwatch $stopwatch)
+    public function setTime($time)
     {
-        $this->options['stopwatch'] = $stopwatch;
+        $this->options['time'] = $time;
+
+        return $this;
+    }
+
+    /**
+     * @param int $memory
+     *
+     * @return $this
+     */
+    public function setMemory($memory)
+    {
+        $this->options['memory'] = $memory;
+
+        return $this;
+    }
+
+    /**
+     * @param string $format
+     *
+     * @return $this
+     */
+    public function setFormat($format)
+    {
+        $this->format = $format;
+
+        return $this;
+    }
+
+    /**
+     * @param array $changed
+     *
+     * @return $this
+     */
+    public function setChanged($changed)
+    {
+        $this->changed = $changed;
 
         return $this;
     }
@@ -125,15 +168,22 @@ final class ReportFactory
      *
      * @return ReportInterface
      */
-    public function getReportByFormat($format)
+    public function getReport()
     {
-        if (!isset($this->reports[$format])) {
-            throw new \UnexpectedValueException(sprintf('Report for format "%s" does not registered.', $format));
+        if (!isset($this->reports[$this->format])) {
+            throw new \UnexpectedValueException(sprintf('Report for format "%s" does not registered.', $this->format));
         }
 
-        $report = $this->reports[$format];
+        $report = $this->reports[$this->format];
 
-        $report->configure($this->options);
+        foreach ($this->options as $option => $value) {
+            $setter = 'set'.ucfirst($option);
+            if (method_exists($report, $setter)) {
+                $report->$setter($value);
+            }
+        }
+
+        $report->setChanged($this->changed);
 
         return $report;
     }
