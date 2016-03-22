@@ -10,9 +10,9 @@
  * with this source code in the file LICENSE.
  */
 
-namespace PhpCsFixer\Tests;
+namespace PhpCsFixer\Report\Tests;
 
-use PhpCsFixer\ReportBuilder;
+use PhpCsFixer\Report\ReportFactory;
 use PhpCsFixer\Test\AccessibleObject;
 
 /**
@@ -20,11 +20,11 @@ use PhpCsFixer\Test\AccessibleObject;
  *
  * @internal
  */
-final class ReportBuilderTest extends \PHPUnit_Framework_TestCase
+final class ReportFactoryTest extends \PHPUnit_Framework_TestCase
 {
     public function testInterfaceIsFluent()
     {
-        $builder = new ReportBuilder();
+        $builder = new ReportFactory();
 
         $testInstance = $builder->registerBuiltInReports();
         $this->assertSame($builder, $testInstance);
@@ -34,12 +34,9 @@ final class ReportBuilderTest extends \PHPUnit_Framework_TestCase
         $this->assertSame($builder, $testInstance);
     }
 
-    /**
-     * @covers PhpCsFixer\ReportBuilder::registerBuiltInReports
-     */
     public function testRegisterBuiltInReports()
     {
-        $builder = new ReportBuilder();
+        $builder = new ReportFactory();
         $builder->registerBuiltInReports();
 
         $accessibleFactory = new AccessibleObject($builder);
@@ -47,13 +44,9 @@ final class ReportBuilderTest extends \PHPUnit_Framework_TestCase
         $this->assertGreaterThan(0, count($accessibleFactory->reports));
     }
 
-    /**
-     * @covers PhpCsFixer\ReportBuilder::getReport
-     * @covers PhpCsFixer\ReportBuilder::registerReport
-     */
     public function testThatCanRegisterAndGetReports()
     {
-        $builder = new ReportBuilder();
+        $builder = new ReportFactory();
 
         $r1 = $this->createReportMock('r1');
         $r2 = $this->createReportMock('r2');
@@ -63,19 +56,18 @@ final class ReportBuilderTest extends \PHPUnit_Framework_TestCase
         $builder->registerReport($r2);
         $builder->registerReport($r3);
 
-        $this->assertSame($r1, $builder->setFormat('r1')->getReport());
-        $this->assertSame($r2, $builder->setFormat('r2')->getReport());
-        $this->assertSame($r3, $builder->setFormat('r3')->getReport());
+        $this->assertSame($r1, $builder->getReport('r1'));
+        $this->assertSame($r2, $builder->getReport('r2'));
+        $this->assertSame($r3, $builder->getReport('r3'));
     }
 
     /**
-     * @covers PhpCsFixer\ReportBuilder::registerReport
      * @expectedException        \UnexpectedValueException
      * @expectedExceptionMessage Report for format "non_unique_name" is already registered.
      */
     public function testRegisterReportWithOccupiedFormat()
     {
-        $factory = new ReportBuilder();
+        $factory = new ReportFactory();
 
         $r1 = $this->createReportMock('non_unique_name');
         $r2 = $this->createReportMock('non_unique_name');
@@ -84,51 +76,19 @@ final class ReportBuilderTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @covers PhpCsFixer\ReportBuilder::getReport
      * @expectedException        \UnexpectedValueException
      * @expectedExceptionMessage Report for format "non_registered_format" does not registered.
      */
     public function testGetNonRegisteredReport()
     {
-        $builder = new ReportBuilder();
+        $builder = new ReportFactory();
 
-        $builder->setFormat('non_registered_format')->getReport();
-    }
-
-    /**
-     * @covers PhpCsFixer\ReportBuilder::setIsDryRun
-     * @covers PhpCsFixer\ReportBuilder::setIsDecoratedOutput
-     * @covers PhpCsFixer\ReportBuilder::setAddAppliedFixers
-     * @covers PhpCsFixer\ReportBuilder::setTime
-     * @covers PhpCsFixer\ReportBuilder::setMemory
-     */
-    public function testSetters()
-    {
-        $builder = new ReportBuilder();
-        $builder->registerBuiltInReports();
-
-        $accessibleBuilder = new AccessibleObject($builder);
-
-        $builder->setIsDryRun(true);
-        $builder->setIsDecoratedOutput(true);
-        $builder->setAddAppliedFixers(true);
-        $builder->setTime(1234);
-        $builder->setMemory(1024 * 1024);
-
-        $expectedOptions = array(
-            'isDryRun' => true,
-            'isDecoratedOutput' => true,
-            'addAppliedFixers' => true,
-            'time' => 1234,
-            'memory' => 1048576,
-        );
-
-        $this->assertSame($expectedOptions, $accessibleBuilder->options);
+        $builder->getReport('non_registered_format');
     }
 
     private function createReportMock($format)
     {
-        $report = $this->getMock('PhpCsFixer\ReportInterface');
+        $report = $this->getMock('PhpCsFixer\Report\ReportInterface');
         $report->expects($this->any())->method('getFormat')->willReturn($format);
 
         return $report;

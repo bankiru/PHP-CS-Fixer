@@ -13,6 +13,7 @@
 namespace PhpCsFixer\Tests\Report;
 
 use PhpCsFixer\Report\JsonReport;
+use PhpCsFixer\Report\ReportConfig;
 
 /**
  * @author Boris Gorbylev <ekho@ekho.name>
@@ -48,15 +49,18 @@ final class JsonReportTest extends \PHPUnit_Framework_TestCase
     ]
 }
 JSON;
-        $this->report->setChanged(
-            array(
-                'someFile.php' => array(
-                    'appliedFixers' => array('some_fixer_name_here'),
-                ),
+
+        $this->assertJsonStringEqualsJsonString(
+            $expectedJson,
+            $this->report->generate(
+                ReportConfig::create()
+                    ->setChanged(array(
+                        'someFile.php' => array(
+                            'appliedFixers' => array('some_fixer_name_here'),
+                        ),
+                    ))
             )
         );
-
-        $this->assertJsonStringEqualsJsonString($expectedJson, $this->report->generate());
     }
 
     public function testProcessWithDiff()
@@ -71,22 +75,23 @@ JSON;
     ]
 }
 JSON;
-        $this->report->setChanged(
-            array(
-                'someFile.php' => array(
-                    'appliedFixers' => array('some_fixer_name_here'),
-                    'diff' => 'this text is a diff ;)',
-                ),
+
+        $this->assertJsonStringEqualsJsonString(
+            $expectedJson,
+            $this->report->generate(
+                ReportConfig::create()
+                    ->setChanged(array(
+                        'someFile.php' => array(
+                            'appliedFixers' => array('some_fixer_name_here'),
+                            'diff' => 'this text is a diff ;)',
+                        ),
+                    ))
             )
         );
-
-        $this->assertJsonStringEqualsJsonString($expectedJson, $this->report->generate());
     }
 
     public function testProcessWithAppliedFixers()
     {
-        $this->report->setAddAppliedFixers(true);
-
         $expectedJson = <<<'JSON'
 {
     "files":[
@@ -97,24 +102,23 @@ JSON;
     ]
 }
 JSON;
-        $this->report->setChanged(
-            array(
-                'someFile.php' => array(
-                    'appliedFixers' => array('some_fixer_name_here'),
-                ),
+
+        $this->assertJsonStringEqualsJsonString(
+            $expectedJson,
+            $this->report->generate(
+                ReportConfig::create()
+                    ->setAddAppliedFixers(true)
+                    ->setChanged(array(
+                        'someFile.php' => array(
+                            'appliedFixers' => array('some_fixer_name_here'),
+                        ),
+                    ))
             )
         );
-
-        $this->assertJsonStringEqualsJsonString($expectedJson, $this->report->generate());
     }
 
     public function testProcessWithTimeAndMemory()
     {
-        $this->report
-            ->setTime(1234)
-            ->setMemory(2.5 * 1024 * 1024)
-        ;
-
         $expectedJson = <<<'JSON'
 {
     "files":[
@@ -128,25 +132,24 @@ JSON;
     }
 }
 JSON;
-        $this->report->setChanged(
-            array(
-                'someFile.php' => array(
-                    'appliedFixers' => array('some_fixer_name_here'),
-                ),
+
+        $this->assertJsonStringEqualsJsonString(
+            $expectedJson,
+            $this->report->generate(
+                ReportConfig::create()
+                    ->setChanged(array(
+                        'someFile.php' => array(
+                            'appliedFixers' => array('some_fixer_name_here'),
+                        ),
+                    ))
+                    ->setMemory(2.5 * 1024 * 1024)
+                    ->setTime(1234)
             )
         );
-
-        $this->assertJsonStringEqualsJsonString($expectedJson, $this->report->generate());
     }
 
     public function testProcessComplex()
     {
-        $this->report
-            ->setAddAppliedFixers(true)
-            ->setTime(1234)
-            ->setMemory(2.5 * 1024 * 1024)
-        ;
-
         $expectedJson = <<<'JSON'
 {
     "files":[
@@ -167,19 +170,25 @@ JSON;
     }
 }
 JSON;
-        $this->report->setChanged(
-            array(
-                'someFile.php' => array(
-                    'appliedFixers' => array('some_fixer_name_here'),
-                    'diff' => 'this text is a diff ;)',
-                ),
-                'anotherFile.php' => array(
-                    'appliedFixers' => array('another_fixer_name_here'),
-                    'diff' => 'another diff here ;)',
-                ),
+
+        $this->assertJsonStringEqualsJsonString(
+            $expectedJson,
+            $this->report->generate(
+                ReportConfig::create()
+                    ->setAddAppliedFixers(true)
+                    ->setChanged(array(
+                        'someFile.php' => array(
+                            'appliedFixers' => array('some_fixer_name_here'),
+                            'diff' => 'this text is a diff ;)',
+                        ),
+                        'anotherFile.php' => array(
+                            'appliedFixers' => array('another_fixer_name_here'),
+                            'diff' => 'another diff here ;)',
+                        ),
+                    ))
+                    ->setMemory(2.5 * 1024 * 1024)
+                    ->setTime(1234)
             )
         );
-
-        $this->assertJsonStringEqualsJsonString($expectedJson, $this->report->generate());
     }
 }
