@@ -174,7 +174,6 @@ XML;
                         ),
                     )
                 )
-                ->setMemory(2.5 * 1024 * 1024)
                 ->setTime(1234)
         );
 
@@ -228,7 +227,6 @@ XML;
                         ),
                     )
                 )
-                ->setMemory(2.5 * 1024 * 1024)
                 ->setTime(1234)
         );
 
@@ -248,17 +246,21 @@ XML;
     {
         $xsdPath = __DIR__.'/../../doc/junit-10.xsd';
 
-        libxml_use_internal_errors(true);
-
         static $errorLevels = array(
             LIBXML_ERR_WARNING => 'Warning',
             LIBXML_ERR_ERROR => 'Error',
             LIBXML_ERR_FATAL => 'Fatal Error',
         );
 
+        $internal = libxml_use_internal_errors(true);
+
         $dom = new \DOMDocument();
 
-        $this->assertTrue($dom->loadXML($xml));
+        $load = $dom->loadXML($xml);
+        if (true !== $load) {
+            libxml_use_internal_errors($internal);
+            $this->assertTrue($load, 'XML loading failed.');
+        }
 
         $dom->schemaValidate($xsdPath);
 
@@ -273,9 +275,11 @@ XML;
                 $error->line
             );
         }
+
         $errors = implode(PHP_EOL, $errors);
 
         libxml_clear_errors();
+        libxml_use_internal_errors($internal);
 
         if (strlen($errors) > 0) {
             $this->fail('Actual xml does not match schema: '.PHP_EOL.$errors);
